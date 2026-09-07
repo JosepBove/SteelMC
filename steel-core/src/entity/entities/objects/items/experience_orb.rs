@@ -18,11 +18,11 @@ use steel_utils::{BlockPos, ChunkPos, Downcast as _, DowncastType, DowncastTypeK
 
 use crate::entity::damage::DamageSource;
 use crate::entity::{
-    Entity, EntityBase, EntityBaseLoad, EntitySyncedData, LivingEntity, RemovalReason,
-    SharedEntity, next_entity_id,
+    Entity, EntityBase, EntityBaseLoad, EntityEventSource, EntitySyncedData, LivingEntity,
+    RemovalReason, SharedEntity, next_entity_id,
 };
 use crate::fluid::get_fluid_state;
-use crate::physics::{MoverType, WorldCollisionProvider};
+use crate::physics::{MoverType, WorldCollisionProvider, has_block_collision};
 use crate::player::Player;
 use crate::world::World;
 
@@ -94,9 +94,24 @@ impl ExperienceOrbEntity {
         value: i32,
         world: Weak<World>,
     ) -> Self {
+        Self::with_value_and_direction(entity_type, id, position, DVec3::ZERO, value, world)
+    }
+
+    /// Vanilla `ExperienceOrb(Level, Vec3 pos, Vec3 roughly, int value)`: random
+    /// spawn motion biased toward `rough_direction`, the orb nudged half its size
+    /// along that direction, and pushed out of any block it would spawn inside.
+    #[must_use]
+    pub fn with_value_and_direction(
+        entity_type: EntityTypeRef,
+        id: i32,
+        position: DVec3,
+        rough_direction: DVec3,
+        value: i32,
+        world: Weak<World>,
+    ) -> Self {
         let entity = Self::new(entity_type, id, position, world);
+        entity.initialize_spawn_movement(rough_direction);
         entity.set_value(value);
-        entity.initialize_spawn_movement();
         entity
     }
 
@@ -111,8 +126,20 @@ impl ExperienceOrbEntity {
         }
     }
 
-    /// Spawns vanilla experience orbs for an XP amount.
-    pub fn award(world: &Arc<World>, position: DVec3, mut amount: i32) {
+    /// Vanilla `ExperienceOrb.award`: spawns orbs for an XP amount with no spawn bias.
+    pub fn award(world: &Arc<World>, position: DVec3, amount: i32) {
+        Self::award_with_direction(world, position, DVec3::ZERO, amount);
+    }
+
+    /// Vanilla `ExperienceOrb.awardWithDirection`: splits `amount` into vanilla
+    /// orb values, merging into nearby matching orbs first, and biases each new
+    /// orb's spawn motion along `rough_direction`.
+    pub fn award_with_direction(
+        world: &Arc<World>,
+        position: DVec3,
+        rough_direction: DVec3,
+        mut amount: i32,
+    ) {
         while amount > 0 {
             let value = Self::get_experience_value(amount);
             amount -= value;
@@ -120,10 +147,11 @@ impl ExperienceOrbEntity {
                 continue;
             }
 
-            let entity: SharedEntity = Arc::new(Self::with_value(
+            let entity: SharedEntity = Arc::new(Self::with_value_and_direction(
                 &vanilla_entities::EXPERIENCE_ORB,
                 next_entity_id(),
                 position,
+                rough_direction,
                 value,
                 Arc::downgrade(world),
             ));
@@ -195,15 +223,57 @@ impl ExperienceOrbEntity {
         self.state.lock().health
     }
 
-    fn initialize_spawn_movement(&self) {
+    /// Vanilla spawn motion: random yaw, random velocity flipped to face
+    /// `rough_direction`, the position nudged half the orb's size along it, then
+    /// `unstuckIfPossible` when the orb would start inside a block.
+    fn initialize_spawn_movement(&self, rough_direction: DVec3) {
         let yaw = rand::random_range(0.0..DEGREE_360);
-        let velocity = DVec3::new(
+        let mut velocity = DVec3::new(
             f64::from(rand::random_range(-0.1f32..0.1)) * 2.0,
             f64::from(rand::random_range(0.0f32..0.2)) * 2.0,
             f64::from(rand::random_range(-0.1f32..0.1)) * 2.0,
         );
+        if rough_direction.length_squared() > 0.0 && rough_direction.dot(velocity) < 0.0 {
+            velocity = -velocity;
+        }
+
+        let size = self.base.bounding_box().size();
+        self.base.set_position_local(
+            self.position() + rough_direction.normalize_or_zero() * (size * 0.5),
+        );
         self.base.set_rotation((yaw, 0.0));
         self.base.set_velocity(velocity);
+
+        if let Some(world) = self.level()
+            && has_block_collision(
+                &WorldCollisionProvider::new(&world),
+                self.base.bounding_box(),
+            )
+        {
+            self.unstuck_if_possible(&world, size);
+        }
+    }
+
+    /// Vanilla `ExperienceOrb.unstuckIfPossible`: moves the orb to the closest
+    /// free spot within `max_distance` of its center.
+    fn unstuck_if_possible(&self, world: &Arc<World>, max_distance: f64) {
+        let dimensions = self.base.dimensions();
+        let width = f64::from(dimensions.width);
+        let height = f64::from(dimensions.height);
+        let center = self.position() + DVec3::new(0.0, height / 2.0, 0.0);
+        let allowed_centers = [WorldAabb::of_size(
+            center,
+            max_distance,
+            max_distance,
+            max_distance,
+        )];
+        let provider = WorldCollisionProvider::for_entity(world, self.as_entity_event_source());
+        if let Some(free_center) =
+            provider.find_free_position(&allowed_centers, center, width, height, width)
+        {
+            self.base
+                .set_position_local(free_center - DVec3::new(0.0, height / 2.0, 0.0));
+        }
     }
 
     fn try_merge_to_existing(world: &Arc<World>, position: DVec3, value: i32) -> bool {
@@ -534,7 +604,7 @@ mod tests {
     use simdnbt::borrow::read_compound as read_borrowed_compound;
     use steel_registry::{init_vanilla_registry, vanilla_damage_types};
 
-    use crate::test_support::test_world;
+    use crate::test_support::{fresh_test_world, insert_ready_full_chunk, test_world};
 
     use super::*;
 
@@ -659,5 +729,71 @@ mod tests {
         assert_eq!(loaded.age(), 42);
         assert_eq!(loaded.health(), 3);
         assert_eq!(loaded.count(), 4);
+    }
+
+    #[test]
+    fn spawn_motion_is_biased_toward_the_rough_direction() {
+        init_vanilla_registry();
+        for _ in 0..64 {
+            let orb = ExperienceOrbEntity::with_value_and_direction(
+                &vanilla_entities::EXPERIENCE_ORB,
+                1,
+                DVec3::ZERO,
+                DVec3::Y,
+                3,
+                Weak::<World>::new(),
+            );
+            assert!(orb.velocity().dot(DVec3::Y) >= 0.0);
+            assert_eq!(orb.value(), 3);
+        }
+    }
+
+    #[test]
+    fn spawn_position_is_nudged_half_the_orb_size_along_the_direction() {
+        init_vanilla_registry();
+        let orb = ExperienceOrbEntity::with_value_and_direction(
+            &vanilla_entities::EXPERIENCE_ORB,
+            1,
+            DVec3::ZERO,
+            DVec3::X,
+            1,
+            Weak::<World>::new(),
+        );
+        let size = orb.base().bounding_box().size();
+        assert!(size > 0.0);
+        assert!((orb.position() - DVec3::new(size * 0.5, 0.0, 0.0)).length() < 1e-9);
+
+        let still = ExperienceOrbEntity::with_value_and_direction(
+            &vanilla_entities::EXPERIENCE_ORB,
+            2,
+            DVec3::new(1.0, 2.0, 3.0),
+            DVec3::ZERO,
+            1,
+            Weak::<World>::new(),
+        );
+        assert_eq!(still.position(), DVec3::new(1.0, 2.0, 3.0));
+    }
+
+    #[test]
+    fn award_with_direction_spawns_orbs_totaling_the_amount() {
+        init_vanilla_registry();
+        let world = fresh_test_world("experience_orb_award_with_direction");
+        let position = DVec3::new(0.5, 80.0, 0.5);
+        insert_ready_full_chunk(&world, ChunkPos::from_entity_pos(position));
+
+        ExperienceOrbEntity::award_with_direction(&world, position, DVec3::Y, 11);
+
+        let orbs: Vec<i32> = world
+            .get_entities_in_aabb(&WorldAabb::of_size(position, 3.0, 3.0, 3.0))
+            .iter()
+            .filter_map(|entity| {
+                entity
+                    .as_ref()
+                    .downcast_ref::<ExperienceOrbEntity>()
+                    .map(ExperienceOrbEntity::value)
+            })
+            .collect();
+        assert_eq!(orbs.iter().sum::<i32>(), 11);
+        assert_eq!(orbs.len(), 3, "11 splits into vanilla values 7, 3, 1");
     }
 }

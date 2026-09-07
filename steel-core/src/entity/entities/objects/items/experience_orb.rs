@@ -22,7 +22,7 @@ use crate::entity::{
     RemovalReason, SharedEntity, next_entity_id,
 };
 use crate::fluid::get_fluid_state;
-use crate::physics::{MoverType, WorldCollisionProvider, has_block_collision};
+use crate::physics::{MoverType, WorldCollisionProvider};
 use crate::player::Player;
 use crate::world::World;
 
@@ -238,17 +238,22 @@ impl ExperienceOrbEntity {
         }
 
         let size = self.base.bounding_box().size();
-        self.base.set_position_local(
-            self.position() + rough_direction.normalize_or_zero() * (size * 0.5),
-        );
+        // Vanilla `Vec3.normalize()` returns the zero vector below length 1.0E-4
+        // rather than only for an exactly-zero input.
+        let nudge_direction = if rough_direction.length_squared() < 1.0e-8 {
+            DVec3::ZERO
+        } else {
+            rough_direction.normalize()
+        };
+        self.base
+            .set_position_local(self.position() + nudge_direction * (size * 0.5));
         self.base.set_rotation((yaw, 0.0));
         self.base.set_velocity(velocity);
 
         if let Some(world) = self.level()
-            && has_block_collision(
-                &WorldCollisionProvider::new(&world),
-                self.base.bounding_box(),
-            )
+            // Vanilla `Level.noCollision(AABB)` is `noCollision(null, box)`, which
+            // also checks entity collisions, so reuse the tick's helper for it.
+            && self.is_aabb_colliding(&world, self.base.bounding_box())
         {
             self.unstuck_if_possible(&world, size);
         }

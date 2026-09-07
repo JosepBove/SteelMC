@@ -871,6 +871,7 @@ mod tests {
 
     use crate::{
         behavior::init_behaviors,
+        block_entity::init_block_entities,
         entity::{
             EntityBase,
             entities::{FireworkRocketEntity, SnowballEntity},
@@ -1061,6 +1062,7 @@ mod tests {
     fn base_block_hit_dispatches_vanilla_block_callbacks() {
         init_vanilla_registry();
         init_behaviors();
+        init_block_entities();
 
         let world = Arc::clone(test_world());
         let chunk_map = Arc::clone(&world.chunk_map);

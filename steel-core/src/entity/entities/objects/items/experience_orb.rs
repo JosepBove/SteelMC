@@ -607,8 +607,11 @@ mod tests {
     use std::io::Cursor;
 
     use simdnbt::borrow::read_compound as read_borrowed_compound;
-    use steel_registry::{init_vanilla_registry, vanilla_damage_types};
+    use steel_registry::{init_vanilla_registry, vanilla_blocks, vanilla_damage_types};
+    use steel_utils::types::UpdateFlags;
 
+    use crate::behavior::init_behaviors;
+    use crate::block_entity::init_block_entities;
     use crate::test_support::{fresh_test_world, insert_ready_full_chunk, test_world};
 
     use super::*;
@@ -794,6 +797,8 @@ mod tests {
     #[test]
     fn award_with_direction_spawns_orbs_totaling_the_amount() {
         init_vanilla_registry();
+        init_behaviors();
+        init_block_entities();
         let world = fresh_test_world("experience_orb_award_with_direction");
         let position = DVec3::new(0.5, 80.0, 0.5);
         insert_ready_full_chunk(&world, ChunkPos::from_entity_pos(position));
@@ -812,5 +817,46 @@ mod tests {
             .collect();
         assert_eq!(orbs.iter().sum::<i32>(), 11);
         assert_eq!(orbs.len(), 3, "11 splits into vanilla values 7, 3, 1");
+    }
+
+    #[test]
+    fn spawn_inside_a_solid_block_unsticks_the_orb() {
+        init_vanilla_registry();
+        init_behaviors();
+        init_block_entities();
+        let world = fresh_test_world("experience_orb_unstuck");
+
+        // Feet placed near the top of the block, with enough headroom above
+        // for `unstuck_if_possible`'s tight search radius (the orb's own
+        // size) to actually reach the free air above the block.
+        let spawn_position = DVec3::new(0.5, 80.9, 0.5);
+        insert_ready_full_chunk(&world, ChunkPos::from_entity_pos(spawn_position));
+
+        let block_pos = BlockPos::from(spawn_position);
+        assert!(world.set_block(
+            block_pos,
+            vanilla_blocks::STONE.default_state(),
+            UpdateFlags::UPDATE_ALL,
+        ));
+
+        let orb = ExperienceOrbEntity::with_value_and_direction(
+            &vanilla_entities::EXPERIENCE_ORB,
+            1,
+            spawn_position,
+            DVec3::ZERO,
+            1,
+            Arc::downgrade(&world),
+        );
+
+        assert_ne!(
+            orb.position(),
+            spawn_position,
+            "unstuck_if_possible should have moved the orb out of the stone block"
+        );
+        assert!(
+            !orb.bounding_box().intersects_block(block_pos),
+            "orb bounding box {:?} should no longer intersect the stone block at {block_pos:?}",
+            orb.bounding_box(),
+        );
     }
 }

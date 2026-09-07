@@ -218,6 +218,8 @@ mod tests {
     use steel_utils::{BlockPos, ChunkPos, Direction, Downcast, WorldAabb};
 
     use super::*;
+    use crate::behavior::init_behaviors;
+    use crate::block_entity::init_block_entities;
     use crate::entity::entities::ExperienceOrbEntity;
     use crate::entity::{
         Entity, EntityHitResult, Projectile, ProjectileHit, SharedEntity, ThrowableItemProjectile,
@@ -262,6 +264,8 @@ mod tests {
     #[test]
     fn hitting_a_block_awards_experience_away_from_the_face_and_discards() {
         init_vanilla_registry();
+        init_behaviors();
+        init_block_entities();
         let world = fresh_test_world("experience_bottle_block_hit");
         let location = DVec3::new(0.5, 80.0, 0.5);
         insert_ready_full_chunk(&world, ChunkPos::from_entity_pos(location));
@@ -300,6 +304,8 @@ mod tests {
     #[test]
     fn hitting_an_entity_awards_experience_back_along_the_flight_path() {
         init_vanilla_registry();
+        init_behaviors();
+        init_block_entities();
         let world = fresh_test_world("experience_bottle_entity_hit");
         let location = DVec3::new(0.5, 80.0, 0.5);
         insert_ready_full_chunk(&world, ChunkPos::from_entity_pos(location));

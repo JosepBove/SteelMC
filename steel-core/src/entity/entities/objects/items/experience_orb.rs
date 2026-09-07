@@ -739,11 +739,23 @@ mod tests {
                 &vanilla_entities::EXPERIENCE_ORB,
                 1,
                 DVec3::ZERO,
-                DVec3::Y,
+                -DVec3::Y,
                 3,
                 Weak::<World>::new(),
             );
-            assert!(orb.velocity().dot(DVec3::Y) >= 0.0);
+            assert!(orb.velocity().y <= 0.0, "{:?}", orb.velocity());
+            assert_eq!(orb.value(), 3);
+        }
+        for _ in 0..64 {
+            let orb = ExperienceOrbEntity::with_value_and_direction(
+                &vanilla_entities::EXPERIENCE_ORB,
+                1,
+                DVec3::ZERO,
+                DVec3::X,
+                3,
+                Weak::<World>::new(),
+            );
+            assert!(orb.velocity().x >= 0.0, "{:?}", orb.velocity());
             assert_eq!(orb.value(), 3);
         }
     }

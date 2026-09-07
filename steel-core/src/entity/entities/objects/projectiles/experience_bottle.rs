@@ -31,7 +31,7 @@ use crate::world::World;
 
 /// Vanilla `ThrownExperienceBottle.getDefaultGravity`.
 const GRAVITY: f64 = 0.07;
-/// Vanilla `ThrownExperienceBottle.onHit` level event data: the water potion colour.
+/// Vanilla `ThrownExperienceBottle.onHit` level event data: the water potion color.
 const WATER_POTION_COLOR: i32 = -13_083_194;
 /// Vanilla base experience per bottle before the two `nextInt(5)` rolls.
 const BASE_EXPERIENCE: i32 = 3;
@@ -157,7 +157,7 @@ impl Projectile for ThrownExperienceBottleEntity {
         };
 
         // VANILLA CLIENT-LOCAL: level event 2002 renders the splash particles on
-        // clients; the server only relays it with the water potion colour.
+        // clients; the server only relays it with the water potion color.
         world.level_event(
             level_events::PARTICLES_SPELL_POTION_SPLASH,
             BlockPos::from(self.position()),

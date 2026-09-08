@@ -131,6 +131,14 @@ impl Experience {
         self
     }
 
+    /// Vanilla `Player.readAdditionalSaveData`: a missing or zero `XpSeed` is
+    /// replaced with a seed drawn from `reroll`.
+    #[must_use]
+    pub fn with_loaded_enchantment_seed(self, saved: i32, reroll: impl FnOnce() -> i32) -> Self {
+        let seed = if saved == 0 { reroll() } else { saved };
+        self.with_enchantment_seed(seed)
+    }
+
     /// Adds levels like vanilla `Player.giveExperienceLevels`.
     pub const fn add_levels(&mut self, additional_levels: i32) {
         if additional_levels == 0 {

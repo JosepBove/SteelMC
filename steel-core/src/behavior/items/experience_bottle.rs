@@ -40,7 +40,9 @@ impl ItemBehavior for ExperienceBottleItem {
         let world = context.world;
 
         let pitch = THROW_PITCH_JITTER_SCALE
-            / (rand::random::<f32>() * THROW_PITCH_JITTER_SCALE + THROW_PITCH_JITTER_BASE);
+            / rand::random_range(
+                THROW_PITCH_JITTER_BASE..THROW_PITCH_JITTER_BASE + THROW_PITCH_JITTER_SCALE,
+            );
         world.play_sound_at(
             &sound_events::ENTITY_EXPERIENCE_BOTTLE_THROW,
             SoundSource::Neutral,

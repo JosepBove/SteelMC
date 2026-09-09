@@ -552,15 +552,6 @@ pub trait BlockEntity: ErasedType + Send + Sync {
     fn game_event_listener(&self) -> Option<SharedGameEventListener> {
         None
     }
-
-    /// Vanilla `BlockEntity.applyComponentsFromItemStack`.
-    ///
-    /// Called in `BlockItem.place` before `placedState.getBlock().setPlacedBy`
-    #[expect(
-        unused_variables,
-        reason = "default trait impl; parameters used by overrides"
-    )]
-    fn apply_components_from_item(&self, item: &ItemStack) {}
 }
 
 /// Final block-entity common-state operations.

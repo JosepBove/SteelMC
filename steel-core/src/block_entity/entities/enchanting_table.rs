@@ -99,7 +99,6 @@ mod tests {
     };
     use steel_registry::item_stack::ItemStack;
     use steel_registry::{init_vanilla_registry, vanilla_blocks, vanilla_items};
-    use steel_utils::translations;
 
     use super::*;
     use crate::test_support::fresh_test_world;
@@ -111,9 +110,6 @@ mod tests {
             vanilla_blocks::ENCHANTING_TABLE.default_state(),
         )
     }
-
-    #[test]
-    fn display_name_falls_back_to_the_container_translation() {
 
     #[test]
     fn applying_item_components_consumes_the_custom_name_and_stores_the_rest() {

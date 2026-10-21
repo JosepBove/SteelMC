@@ -366,5 +366,3 @@ fn books_become_enchanted_books_with_stored_enchantments() {
             .is_some_and(|stored| !stored.is_empty())
     );
 }
-
-#[test]

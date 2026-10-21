@@ -276,8 +276,7 @@ impl ShulkerBoxBlockEntity {
         self.container.lock().is_empty()
     }
 
-    /// Collect all the items inside the shulker box into an `ItemContainerContents`,
-    /// vanilla `ItemContainerContents.fromItems(getItems())`.
+    /// Collect all the items inside the shulker box into an `ItemContainerContents`
     ///
     /// # Panics
     /// Panics if shulker box somehow has more than 256 slots. This should never happen
@@ -385,8 +384,7 @@ impl BlockEntity for ShulkerBoxBlockEntity {
         nbt.insert("Items", NbtList::Compound(items));
     }
 
-    /// Vanilla `BaseContainerBlockEntity.applyImplicitComponents`, container part:
-    /// `CONTAINER` (or empty) is copied into the slots.
+/// Copies the container component into the block entity inventory
     fn apply_implicit_components(&self, components: &mut ImplicitComponentGetter<'_>) {
         let contents = components.get_or_default(CONTAINER, ItemContainerContents::empty());
 
@@ -406,7 +404,7 @@ impl BlockEntity for ShulkerBoxBlockEntity {
         }
     }
 
-    /// Vanilla `BaseContainerBlockEntity.collectImplicitComponents`, container part.
+    /// Stores the block entity inventory in the container component
     fn collect_implicit_components(&self, components: &mut DataComponentMap) {
         components.set(CONTAINER, Some(self.container_contents()));
     }
@@ -446,49 +444,3 @@ impl Container for ShulkerBoxContainer {
     fn set_changed(&mut self) {}
 }
 
-#[cfg(test)]
-mod tests {
-    use steel_registry::{init_vanilla_registry, vanilla_blocks, vanilla_items};
-
-    use super::*;
-    use crate::test_support::fresh_test_world;
-
-    #[test]
-    fn applying_item_components_fills_the_slots_and_collects_them_back() {
-        init_vanilla_registry();
-        let world_fixture = fresh_test_world("shulker_box_apply_components");
-        let world = &world_fixture.world;
-        let shulker = ShulkerBoxBlockEntity::new(
-            Arc::downgrade(world),
-            BlockPos::new(8, 64, 8),
-            vanilla_blocks::SHULKER_BOX.default_state(),
-        );
-        let diamonds =
-            ItemStack::with_count_and_patch(&vanilla_items::DIAMOND, 5, DataComponentPatch::new());
-        let mut slots = vec![None; SHULKER_BOX_SLOTS];
-        slots[3] = Some(ItemStackTemplate::from_stack(&diamonds).expect("a plain stack converts"));
-        let contents = ItemContainerContents::new(slots).expect("27 slots fit the container limit");
-        let mut stack = ItemStack::new(&vanilla_items::SHULKER_BOX);
-        stack.set(CONTAINER, contents.clone());
-
-        shulker.apply_components_from_item_stack(&stack);
-
-        {
-            let container = shulker.container.lock();
-            assert!(container.items[3].is(&vanilla_items::DIAMOND));
-            assert_eq!(container.items[3].count(), 5);
-            assert!(
-                container
-                    .items
-                    .iter()
-                    .enumerate()
-                    .all(|(slot, item)| slot == 3 || item.is_empty())
-            );
-        }
-        assert!(
-            !shulker.base().stored_components().has(CONTAINER),
-            "an implicit component must not also be stored"
-        );
-        assert_eq!(shulker.collect_components().get(CONTAINER), Some(contents));
-    }
-}

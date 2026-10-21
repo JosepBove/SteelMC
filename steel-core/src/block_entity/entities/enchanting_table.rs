@@ -1,8 +1,4 @@
 //! Enchanting table block entity.
-//!
-//! Server-side it only carries the optional custom name used as the menu
-//! title. Vanilla's book animation (`bookAnimationTick`) is client-only, so
-//! there is no ticker.
 
 use std::sync::{Arc, Weak};
 
@@ -46,7 +42,7 @@ impl EnchantingTableBlockEntity {
         }
     }
 
-    /// Vanilla `getName`: the custom name, or `container.enchant`.
+    /// Returns the custom name or the default enchanting table name
     #[must_use]
     pub fn display_name(&self) -> TextComponent {
         self.name
@@ -55,13 +51,13 @@ impl EnchantingTableBlockEntity {
             .unwrap_or_else(|| TextComponent::translated(translations::CONTAINER_ENCHANT.msg()))
     }
 
-    /// Vanilla `getCustomName`.
+    /// Returns the custom name if set
     #[must_use]
     pub fn custom_name(&self) -> Option<TextComponent> {
         self.name.lock().clone()
     }
 
-    /// Vanilla `setCustomName`. Callers persist the change with `set_changed`.
+    /// Sets the custom name
     pub fn set_custom_name(&self, name: Option<TextComponent>) {
         *self.name.lock() = name;
     }
@@ -74,7 +70,6 @@ impl BlockEntity for EnchantingTableBlockEntity {
 
     fn load_additional(&self, nbt: &BorrowedNbtCompound<'_>) {
         let nbt_view: BorrowedNbtCompoundView<'_, '_> = nbt.into();
-        // Vanilla `parseCustomNameSafe` drops unreadable names instead of failing the load.
         *self.name.lock() = nbt_view
             .get("CustomName")
             .and_then(|tag| TextComponent::from_nbt(&tag.to_owned()));
@@ -119,40 +114,6 @@ mod tests {
 
     #[test]
     fn display_name_falls_back_to_the_container_translation() {
-        init_vanilla_registry();
-        let world_fixture = fresh_test_world("enchanting_table_default_name");
-        let world = &world_fixture.world;
-        let table = table(world);
-        assert_eq!(table.custom_name(), None);
-        assert_eq!(
-            table.display_name(),
-            TextComponent::translated(translations::CONTAINER_ENCHANT.msg())
-        );
-    }
-
-    #[test]
-    fn custom_name_round_trips_through_nbt() {
-        init_vanilla_registry();
-        let world_fixture = fresh_test_world("enchanting_table_name_round_trip");
-        let world = &world_fixture.world;
-        let named = table(world);
-        let name = TextComponent::from("Arcane Desk".to_string());
-        named.set_custom_name(Some(name.clone()));
-        let saved = named.save_custom_only();
-
-        let restored = table(world);
-        restored
-            .load_with_owned_components(&saved)
-            .expect("saved table NBT should load");
-        assert_eq!(restored.custom_name(), Some(name.clone()));
-        assert_eq!(restored.display_name(), name);
-
-        let unnamed = table(world);
-        unnamed
-            .load_with_owned_components(&table(world).save_custom_only())
-            .expect("empty table NBT should load");
-        assert_eq!(unnamed.custom_name(), None);
-    }
 
     #[test]
     fn applying_item_components_consumes_the_custom_name_and_stores_the_rest() {

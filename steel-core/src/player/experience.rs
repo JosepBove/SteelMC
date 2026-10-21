@@ -105,7 +105,7 @@ impl Experience {
         (self.progress * Self::points_for_level(self.level) as f32).floor() as i32
     }
 
-    /// Vanilla `totalExperience`.
+    /// Total experience points earned, independent of the current level or progress.
     #[must_use]
     pub const fn total_points(&self) -> i32 {
         self.total_points

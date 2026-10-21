@@ -110,7 +110,6 @@ fn tag_ref(tag: &Identifier) -> String {
 }
 
 impl Enchantment {
-    /// Vanilla `Enchantment::matchingSlot`.
     #[must_use]
     pub fn matching_slot(&self, slot: EquipmentSlot) -> bool {
         self.slots.iter().any(|group| group.test(slot))

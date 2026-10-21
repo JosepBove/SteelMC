@@ -17,7 +17,7 @@ use crate::enchantment_helper::{EnchantmentInstance, get_enchantment_cost, selec
 use crate::inventory::container::DEFAULT_DISTANCE_BUFFER;
 use crate::inventory::prelude::*;
 use crate::inventory::slots::EnchantItemSlot;
-use crate::player::player_inventory::PlayerInventory;
+use crate::player::player_inventory::{PlayerInventory, Prediction};
 use crate::world::World;
 
 /// Number of selectable offers.
@@ -280,7 +280,7 @@ impl MenuKind for EnchantmentKind {
         else {
             log::debug!(
                 "{} pressed invalid button id: {button_id}",
-                player.gameprofile.name
+                player.gameprofile.name()
             );
             return false;
         };
@@ -421,7 +421,7 @@ impl MenuKind for EnchantmentKind {
             return Some(ItemStack::empty());
         }
         if let Some(remainder) = behavior.slots()[slot_index].on_take(guard, &remaining, player) {
-            player.add_item_or_drop_with_guard(guard, remainder);
+            player.add_item_or_drop_with_guard(guard, remainder, Prediction::Predicted);
         }
         Some(clicked)
     }

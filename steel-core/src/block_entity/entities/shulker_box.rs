@@ -113,7 +113,8 @@ impl ShulkerBoxBlockEntity {
         let container = Arc::new(SyncMutex::new(ShulkerBoxContainer {
             items: vec![ItemStack::empty(); SHULKER_BOX_SLOTS],
         }));
-        let shared_container: SharedContainer = container.clone();
+        let shared_container: SharedContainer =
+            Arc::<SyncMutex<ShulkerBoxContainer>>::clone(&container);
         Self {
             container_ref: ContainerRef::owned_by_block_entity(shared_container, Arc::clone(&base)),
             base,
@@ -179,7 +180,7 @@ impl ShulkerBoxBlockEntity {
 
         let entities = world.get_entities_in_aabb(&aabb);
         for entity in entities {
-            if entity.piston_push_reaction() == PushReaction::Ignore {
+            if entity.piston_push_reaction() == PushReaction::IgnoreEntity {
                 continue;
             }
             let (offset_x, offset_y, offset_z) = direction.offset();
@@ -455,9 +456,10 @@ mod tests {
     #[test]
     fn applying_item_components_fills_the_slots_and_collects_them_back() {
         init_vanilla_registry();
-        let world = fresh_test_world("shulker_box_apply_components");
+        let world_fixture = fresh_test_world("shulker_box_apply_components");
+        let world = &world_fixture.world;
         let shulker = ShulkerBoxBlockEntity::new(
-            Arc::downgrade(&world),
+            Arc::downgrade(world),
             BlockPos::new(8, 64, 8),
             vanilla_blocks::SHULKER_BOX.default_state(),
         );

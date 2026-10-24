@@ -14,7 +14,6 @@ use steel_registry::block_entity_type::BlockEntityTypeRef;
 use steel_registry::data_components::vanilla_components::{
     SIGN_TEXT_BACK, SIGN_TEXT_FRONT, SignText as SignTextComponent, WAXED,
 };
-use steel_registry::item_stack::ItemStack;
 use steel_registry::sound_event::SoundEventRef;
 use steel_registry::sound_events::{
     BLOCK_HANGING_SIGN_WAXED_INTERACT_FAIL, BLOCK_SIGN_WAXED_INTERACT_FAIL,
